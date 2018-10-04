@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+  <meta name="author" content="Piet Althoff">
+
+  <meta name="robots" content="index,follow">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/4.1.3/journal/bootstrap.min.css"
+  integrity="sha256-I0orVBIi7mcdp1qebo3yWpz/6+IATPzkVmgWNOqgMZQ=" crossorigin="anonymous" />
+</head>
+<title>Imgur Comment Subscriber</title>
+
+<body>
+  <div id="app">
+    <div class="container">
+      <h1>Imgur Comment Subscriber</h1>
+      <div class="row" v-if="subscribers.length === 0">
+        <div class="col-sm-12">
+          <h5>Instructions</h5>
+          <ul>
+            <li>Tell your users to comment anything under one specific comment to subscribe and comment 'unsub' to unsubscribe</li>
+            <li>Open your post in Chrome and search for your 'subscribe comment' - click the three dots and click 'Permalink'</li>
+            <li>Scroll to the end of the page, until no more comments load. This might take a while. (Use Page down keys)</li>
+            <li>Now open the dev tools (press F12) and select the 'select tool' (top left) and highlight the comment section<br>
+              <strong>&lt;div data-level='0' class='comment expanded'&gt;</strong></li> needs to be selected
+            <li>Right click on the &lt;div&gt; then 'Copy' then 'Copy element'</li>
+            <li>Now past the code in the textbox below (might take a while), enter your username and press 'Extract & Build Comments'</li>
+            <li>If you click a generated comment it will be pasted in your clipboard and highlighted</li>
+          </ul>
+          <input type="text" placeholder="Your username" class="form-control" v-model="ownUsername"/>
+          <textarea v-model="code" placeholder="Paste code here" class="form-control" rows="5" id="code"></textarea>
+          <br>
+          <button type="button" class="btn btn-success" @click="extractNewSubscribers">Extract & Build comments</button>
+        </div>
+      </div>
+      <div class="row" v-if="subscribers.length > 0">
+        <div class="col-md-12">
+          <h4>old subscribers : {{ numberOfOldSubs }}</h4>
+          <h4>new subscribers : {{ subscribers.length - numberOfOldSubs }}</h4>
+          <h4>total subscribers : {{ subscribers.length }}</h4>
+          <h3>comments ({{comments.length}})</h3>
+          <div class="card bg-light" v-for="comment in comments">
+            <div class="card-body">
+              <p class="card-text" @click="copyText">{{ comment }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row" v-if="traitors.length > 0">
+        <h4>unsubscribed</h4>
+        <div class="col-md-12">
+          <li v-for="traitor in traitors">
+            {{ traitor }}
+          </li>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.5.17/dist/vue.js"></script>
+  <script>
+    const app = new Vue({
+      el: '#app',
+      data: function () {
+        return {
+          code: '',
+          ownUsername: '',
+          subscribers: [],
+          traitors: [],
+          numberOfOldSubs: 0,
+          comments: []
+        }
+      },
+      methods: {
+        extractNewSubscribers: function () {
+
+          this.code = this.code.replace(/\r?\n|\r|\t/g, '');
+          this.ownUsername = this.ownUsername.trim();
+
+          let nameAndCommentRegEx = /<div class="author">.*?title="(.*?)".*?(?:<span><span>|<span class="linkified">)(.*?)<\/span>(?:<\/span>|<div class="comment-create-reply">)/ig;
+          let mentionedCommentsRegEx = />\@([\w\d]*)</ig;
+
+          let matchAuthorComment = nameAndCommentRegEx.exec(this.code);
+          while (matchAuthorComment != null) {
+
+            let author = matchAuthorComment[1];
+            let comment = matchAuthorComment[2];
+
+            if (/^unsub(scribe)?$/i.test(comment)) {
+              this.traitors.push(author);
+            } else {
+              //add old subscribers from last subscriber comments
+              let matchedNames = mentionedCommentsRegEx.exec(comment);
+              while (matchedNames != null) {
+                this.numberOfOldSubs++;
+                this.subscribers.push(matchedNames[1]);
+                matchedNames = mentionedCommentsRegEx.exec(comment);
+              }
+              mentionedCommentsRegEx.lastIndex = 0;
+
+              //add author of comment to subscribers
+              if (author !== "OP" && author !== this.ownUsername) {
+                this.subscribers.push(author);
+              }
+            }
+            matchAuthorComment = nameAndCommentRegEx.exec(this.code);
+          }
+
+          ///make unique and remove all traitors
+          this.traitors = [...new Set(this.traitors)].filter(Boolean);
+          this.subscribers = [...new Set(this.subscribers)].filter(Boolean);
+          this.subscribers = this.subscribers.filter((el) => !this.traitors.includes(el));
+
+          this.buildComments();
+        },
+        buildComments: function () {
+          let stockOfSubscribers = [...this.subscribers];
+          while (stockOfSubscribers.length > 0) {
+            let commentNames = [];
+            let openPositions = 140 + 1; //for first missing Space
+            let fittingUserLeft = true;
+
+            while (openPositions > 0 && fittingUserLeft && stockOfSubscribers.length > 0) {
+              if (openPositions > 70) {
+                let userToBeAdded = stockOfSubscribers.pop();
+                commentNames.push(userToBeAdded);
+                openPositions -= userToBeAdded.length + 2; ///for '@' and Space
+              } else {
+                let fittingUser = (
+                  stockOfSubscribers.find(a => { return (a.length + 2) === openPositions }) ||
+                  stockOfSubscribers.find(a => { return (a.length + 2) < (openPositions - 6) }) ||
+                  stockOfSubscribers.find(a => { return (a.length + 2) < openPositions })
+                );
+
+                if (fittingUser) {
+                  let foundUser = stockOfSubscribers.splice(stockOfSubscribers.indexOf(fittingUser), 1);
+                  commentNames.push(foundUser);
+                  openPositions -= fittingUser.length + 2; ///for '@' and Space
+                }
+                fittingUserLeft = !!fittingUser;
+              }
+            }
+            this.comments.push(commentNames.map(a => { return '@' + a }).join(' '));
+          }
+        },
+        copyText: function (e) {
+          let temp = document.createElement("input");
+          temp.type = "text";
+          temp.value = e.target.innerText;
+
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand("copy");
+          temp.remove();
+          e.target.classList.add('bg-success');
+        }
+      }
+    })
+  </script>
+</body>
+
+</html>
