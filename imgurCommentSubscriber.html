@@ -114,7 +114,7 @@
           ///make unique and remove all traitors
           this.traitors = [...new Set(this.traitors)].filter(Boolean);
           this.subscribers = [...new Set(this.subscribers)].filter(Boolean);
-          this.subscribers = this.subscribers.filter((el) => !this.traitors.includes(el));
+          this.subscribers = this.subscribers.filter((username) => !this.traitors.includes(username));
 
           this.buildComments();
         },
@@ -126,15 +126,15 @@
             let fittingUserLeft = true;
 
             while (openPositions > 0 && fittingUserLeft && stockOfSubscribers.length > 0) {
-              if (openPositions > 70) {
+              if (stockOfSubscribers[stockOfSubscribers.length - 1].length < (openPositions - 25)) {
                 let userToBeAdded = stockOfSubscribers.pop();
                 commentNames.push(userToBeAdded);
                 openPositions -= userToBeAdded.length + 2; ///for '@' and Space
               } else {
                 let fittingUser = (
-                  stockOfSubscribers.find(a => { return (a.length + 2) === openPositions }) ||
-                  stockOfSubscribers.find(a => { return (a.length + 2) < (openPositions - 6) }) ||
-                  stockOfSubscribers.find(a => { return (a.length + 2) < openPositions })
+                  stockOfSubscribers.find(username => { return (username.length + 2) === openPositions }) ||
+                  stockOfSubscribers.find(username => { return (username.length + 2) < (openPositions - 6) }) ||
+                  stockOfSubscribers.find(username => { return (username.length + 2) < openPositions })
                 );
 
                 if (fittingUser) {
@@ -145,7 +145,7 @@
                 fittingUserLeft = !!fittingUser;
               }
             }
-            this.comments.push(commentNames.map(a => { return '@' + a }).join(' '));
+            this.comments.push(commentNames.map(username => { return '@' + username }).join(' '));
           }
         },
         copyText: function (e) {
